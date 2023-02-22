@@ -29,9 +29,14 @@ fn source() -> gst::Element {
         "videotestsrc is-live=true pattern=ball !
          video/x-raw,format=I420,width=640,height=480,framerate=60/1 !
          identity silent=false dump=false !
+         tee name=shmtee !
          queue !
          shmsink name=source_shmsink socket-path=/tmp/pulldemo
          sync=false wait-for-connection=false
+         shmtee. !
+         queue !
+         videoconvert !
+         fpsdisplaysink
          ",
     )
     .unwrap()
@@ -65,6 +70,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let sink = gst_app::AppSink::builder()
         .name("appsink")
+        .drop(true)
+        .max_buffers(30)
+        .wait_on_eos(false)
         .sync(false)
         .build();
 
@@ -96,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     src.set_state(gst::State::Playing)?;
     disp.set_state(gst::State::Playing)?;
 
-    let pl = gst::Pipeline::new(None);
+    let pl = gst::Pipeline::new(Some("aps_pl"));
     let elems = [&shmsrc, &cf, sink.upcast_ref()];
     pl.add_many(&elems)?;
     gst::Element::link_many(&elems)?;
@@ -108,14 +116,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let v = rx.recv().unwrap();
         if v == target {
             println!("Stopping appsink pipeline");
+            // It appears that it is critical to replace the callback with an empty one
+            // before shutting down the pipeline! I was previously not doing this and the
+            // thing would crash when you stopped the pipeline.
+            sink.set_callbacks(gst_app::AppSinkCallbacks::builder().build());
             pl.set_state(gst::State::Null).unwrap();
+
             return;
         }
     });
 
     println!("Setting appsink pipeline to playing");
 
-    std::thread::sleep(std::time::Duration::from_secs(300));
+    std::thread::sleep(std::time::Duration::from_secs(30));
 
     counter_task.join().unwrap();
 
