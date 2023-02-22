@@ -1,0 +1,19 @@
+[package]
+name = "apsdbg"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gst = { package = "gstreamer", version = "0.19" }
+gst-app = { package = "gstreamer-app", version = "0.19" }
+gst-video = { package = "gstreamer-video", version = "0.19" }
+tokio = { version = "1.23", features = ["macros", "rt-multi-thread", "fs"] }
+tokio-stream = "0.1"
+log = "0.4"
+env_logger = "0.10"
+
+[[bin]]
+name = "pull"
+path = "src/pull.rs"
